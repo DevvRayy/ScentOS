@@ -6,22 +6,18 @@
   "use strict";
 
   function init() {
-    try {
-      Scentos.ui.init();
-    } catch (err) {
-      console.error("[Scentos] UI init error:", err);
-    }
-
+    Scentos.ui.init();
     Scentos.state.setStatus("loading");
 
-    Scentos.db.getAllPerfumes().then(function (list) {
-      Scentos.state.setPerfumes(list);
-    }).catch(function (err) {
-      console.error("[Scentos] Failed to load data:", err);
-      Scentos.state.setStatus(
-        "error",
-        (err && err.message) || "Tidak bisa mengakses penyimpanan lokal."
-      );
+    // Load perfumes & journals secara paralel
+    Promise.all([
+      Scentos.db.getAllPerfumes(),
+      Scentos.db.getAllJournals()
+    ]).then(function(results) {
+      Scentos.state.setData(results[0], results[1]);
+    }).catch(function(err) {
+      console.error("[Scentos] Load error:", err);
+      Scentos.state.setStatus("error", (err && err.message) || "Gagal buka database.");
     });
   }
 
