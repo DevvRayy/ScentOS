@@ -1,5 +1,5 @@
 /* =========================================================
-   SCENTOS — UI Layer (interaksi, modal, toast, form)
+   SCENTOS — UI Layer (Interaksi, Modal, Toast, Form)
    ========================================================= */
 
 (function (Scentos) {
@@ -8,9 +8,15 @@
   var utils = Scentos.utils;
   var db = Scentos.db;
   var stateApi = Scentos.state;
+  var CONST = Scentos.CONST;
 
-  var currentModal = null; // { mode, perfume, previousFocus }
+  var currentModal = null;
   var searchTimer = null;
+
+  /* ---------- Icons (inline SVG string) ---------- */
+  var icons = {
+    bottle: '<svg width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 20 V13 a3 3 0 0 1 3-3 h8 a3 3 0 0 1 3 3 v7"/><rect x="15" y="20" width="26" height="28" rx="4"/><line x1="22" y1="32" x2="34" y2="32"/></svg>'
+  };
 
   /* ---------- Toast ---------- */
   function showToast(message, type) {
@@ -23,47 +29,30 @@
     root.appendChild(toast);
     window.setTimeout(function () {
       toast.classList.add("toast--leaving");
-      window.setTimeout(function () {
-        if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 220);
+      window.setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 220);
     }, 2800);
   }
 
-  /* ---------- Modal core ---------- */
+  /* ---------- Modal Core ---------- */
   function trapFocus(modal) {
     modal.addEventListener("keydown", function (e) {
       if (e.key !== "Tab") return;
-      var focusables = modal.querySelectorAll(
-        'button:not(:disabled), [href], input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
-      );
+      var focusables = modal.querySelectorAll('button:not(:disabled), [href], input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled)');
       if (!focusables.length) return;
-      var first = focusables[0];
-      var last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      var first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     });
   }
 
   function closeModal() {
     var root = document.getElementById("modal-root");
     if (!root) return;
-    if (!currentModal) {
-      root.innerHTML = "";
-      document.body.classList.remove("modal-open");
-      return;
-    }
-    var previousFocus = currentModal.previousFocus;
+    var prev = currentModal ? currentModal.previousFocus : null;
     currentModal = null;
     root.innerHTML = "";
     document.body.classList.remove("modal-open");
-    if (previousFocus && typeof previousFocus.focus === "function" && document.contains(previousFocus)) {
-      previousFocus.focus();
-    }
+    if (prev && typeof prev.focus === "function" && document.contains(prev)) prev.focus();
   }
 
   function openModalRoot(html, opts) {
@@ -73,464 +62,402 @@
 
     currentModal = {
       mode: (opts && opts.mode) || "add",
-      perfume: (opts && opts.perfume) || null,
+      data: (opts && opts.data) || null,
       previousFocus: document.activeElement
     };
 
     root.innerHTML = html;
     document.body.classList.add("modal-open");
-
     var modal = root.querySelector(".modal");
-    if (!modal) return;
-    trapFocus(modal);
+    if (modal) trapFocus(modal);
 
-    // Pasang handler klik (delegasi backdrop + tombol close)
-    modal.addEventListener("click", function (e) {
-      var actionEl = e.target.closest("[data-action]");
-      if (!actionEl) return;
-      var action = actionEl.getAttribute("data-action");
-      if (action === "close-modal") {
-        e.preventDefault();
-        closeModal();
-      } else if (action === "confirm-delete") {
-        e.preventDefault();
-        confirmDelete();
-      }
-    });
-
-    // Autofocus
     var auto = modal.querySelector("[data-autofocus]");
-    if (auto) {
-      window.requestAnimationFrame(function () {
-        if (auto && typeof auto.focus === "function") auto.focus();
-      });
-    }
+    if (auto) window.requestAnimationFrame(function () { if (auto) auto.focus(); });
   }
 
-  /* ---------- Form modal ---------- */
-  function renderFormModal(perfume) {
+  /* ---------- PERFUME Form Modal ---------- */
+  function renderPerfumeModal(perfume) {
     var isEdit = !!perfume;
-    var title = isEdit ? "Edit Parfum" : "Tambah Parfum";
     var p = perfume || {};
-    var notes = p.notes || {};
-    var top = (notes.top || []).join(", ");
-    var mid = (notes.mid || []).join(", ");
-    var base = (notes.base || []).join(", ");
-    var sizeMl = p.sizeMl != null ? p.sizeMl : "";
-    var remaining = p.remainingMl != null ? p.remainingMl : "";
-    var price = p.priceBuy != null ? p.priceBuy : "";
-    var date = p.purchaseDate || "";
-    var rating = p.rating != null ? p.rating : 3;
-
+    var n = p.notes || {};
+    var rating = p.rating || 3;
     var stars = "";
     for (var s = 1; s <= 5; s++) {
-      stars +=
-        '<button type="button" class="rating-picker__star' +
-        (s <= rating ? " is-active" : "") +
-        '" role="radio" aria-checked="' +
-        (s === rating ? "true" : "false") +
-        '" aria-label="' + s + ' bintang" data-value="' + s + '">\u2605</button>';
+      stars += '<button type="button" class="rating-picker__star '+(s<=rating?'is-active':'')+'" data-value="'+s+'">\u2605</button>';
+    }
+    // (Form HTML di sini persis sama kayak Tahap 1, gue rapihin sedikit)
+    return '<div class="modal" role="dialog" aria-modal="true"><div class="modal__backdrop" data-action="close-modal"></div><div class="modal__panel">' +
+      '<header class="modal__header"><h2 class="modal__title">'+(isEdit?'Edit':'Tambah')+' Parfum</h2><button type="button" class="btn btn--ghost btn--icon" data-action="close-modal">X</button></header>' +
+      '<form id="perfume-form" class="form" novalidate>' +
+      '<div class="form__grid"><div class="field"><label class="field__label">Nama *</label><input name="name" class="field__input" required value="'+utils.escapeHtml(p.name||'')+'" data-autofocus><span class="field__error" id="f-name-error"></span></div>' +
+      '<div class="field"><label class="field__label">Brand *</label><input name="brand" class="field__input" required value="'+utils.escapeHtml(p.brand||'')+'"><span class="field__error" id="f-brand-error"></span></div></div>' +
+      '<div class="field"><label class="field__label">Top Notes</label><input name="topNotes" class="field__input" value="'+utils.escapeHtml((n.top||[]).join(', '))+'"></div>' +
+      '<div class="field"><label class="field__label">Mid Notes</label><input name="midNotes" class="field__input" value="'+utils.escapeHtml((n.mid||[]).join(', '))+'"></div>' +
+      '<div class="field"><label class="field__label">Base Notes</label><input name="baseNotes" class="field__input" value="'+utils.escapeHtml((n.base||[]).join(', '))+'"></div>' +
+      '<div class="form__grid"><div class="field"><label class="field__label">Ukuran (ml) *</label><input name="sizeMl" type="number" class="field__input" required value="'+utils.escapeHtml(p.sizeMl||'')+'"><span class="field__error" id="f-sizeMl-error"></span></div>' +
+      '<div class="field"><label class="field__label">Sisa (ml)</label><input name="remainingMl" type="number" class="field__input" value="'+utils.escapeHtml(p.remainingMl!=null?p.remainingMl:'')+'"><span class="field__error" id="f-remainingMl-error"></span></div></div>' +
+      '<div class="form__grid"><div class="field"><label class="field__label">Harga Beli</label><input name="priceBuy" type="number" class="field__input" value="'+utils.escapeHtml(p.priceBuy||'')+'"></div>' +
+      '<div class="field"><label class="field__label">Tgl Beli</label><input name="purchaseDate" type="date" class="field__input" value="'+utils.escapeHtml(p.purchaseDate||new Date().toISOString().slice(0,10))+'"></div></div>' +
+      '<div class="field"><span class="field__label">Rating</span><div class="rating-picker" id="rating-picker">'+stars+'</div><input type="hidden" name="rating" value="'+rating+'"></div>' +
+      '<div class="form__actions"><button type="button" class="btn btn--ghost" data-action="close-modal">Batal</button><button type="submit" class="btn btn--primary">Simpan</button></div>' +
+      '</form></div></div>';
+  }
+
+  /* ---------- JOURNAL Form Modal ---------- */
+  function renderJournalModal(journal) {
+    var isEdit = !!journal;
+    var j = journal || {};
+    var perfumes = stateApi.get().perfumes;
+    
+    // Perfume Dropdown
+    var pOpts = '<option value="">-- Pilih Parfum --</option>';
+    for (var i = 0; i < perfumes.length; i++) {
+      var sel = (j.perfumeId === perfumes[i].id) ? " selected" : "";
+      pOpts += '<option value="'+utils.escapeHtml(perfumes[i].id)+'"'+sel+'>'+utils.escapeHtml(perfumes[i].name)+'</option>';
     }
 
-    return (
-      '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
-      '<div class="modal__backdrop" data-action="close-modal"></div>' +
-      '<div class="modal__panel">' +
-      '<header class="modal__header">' +
-      '<h2 id="modal-title" class="modal__title">' + title + "</h2>" +
-      '<button type="button" class="btn btn--ghost btn--icon" data-action="close-modal" aria-label="Tutup">' +
-      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">' +
-      '<line x1="18" y1="6" x2="6" y2="18"/>' +
-      '<line x1="6" y1="6" x2="18" y2="18"/>' +
-      "</svg>" +
-      "</button>" +
-      "</header>" +
-      '<form id="perfume-form" class="form" novalidate>' +
-      '<div class="form__grid">' +
-      '<div class="field">' +
-      '<label for="f-name" class="field__label">Nama Parfum <span class="field__required">*</span></label>' +
-      '<input id="f-name" name="name" type="text" class="field__input" placeholder="Baccarat Rouge 540" autocomplete="off" required aria-describedby="f-name-error" data-autofocus>' +
-      '<span class="field__error" id="f-name-error" role="alert"></span>' +
-      "</div>" +
-      '<div class="field">' +
-      '<label for="f-brand" class="field__label">Brand <span class="field__required">*</span></label>' +
-      '<input id="f-brand" name="brand" type="text" class="field__input" placeholder="Maison Francis Kurkdjian" autocomplete="off" required aria-describedby="f-brand-error">' +
-      '<span class="field__error" id="f-brand-error" role="alert"></span>' +
-      "</div>" +
-      "</div>" +
-      '<div class="field">' +
-      '<label for="f-top" class="field__label">Top Notes <span class="field__hint">pisahkan dengan koma</span></label>' +
-      '<input id="f-top" name="topNotes" type="text" class="field__input" placeholder="saffron, jasmine" autocomplete="off">' +
-      "</div>" +
-      '<div class="field">' +
-      '<label for="f-mid" class="field__label">Middle Notes</label>' +
-      '<input id="f-mid" name="midNotes" type="text" class="field__input" placeholder="amberwood, ambergris" autocomplete="off">' +
-      "</div>" +
-      '<div class="field">' +
-      '<label for="f-base" class="field__label">Base Notes</label>' +
-      '<input id="f-base" name="baseNotes" type="text" class="field__input" placeholder="fir resin, cedar" autocomplete="off">' +
-      "</div>" +
-      '<div class="form__grid">' +
-      '<div class="field">' +
-      '<label for="f-size" class="field__label">Ukuran (ml) <span class="field__required">*</span></label>' +
-      '<input id="f-size" name="sizeMl" type="number" class="field__input" min="1" step="1" inputmode="numeric" required value="' + utils.escapeHtml(sizeMl) + '" aria-describedby="f-size-error">' +
-      '<span class="field__error" id="f-size-error" role="alert"></span>' +
-      "</div>" +
-      '<div class="field">' +
-      '<label for="f-remaining" class="field__label">Sisa Isi (ml)</label>' +
-      '<input id="f-remaining" name="remainingMl" type="number" class="field__input" min="0" step="0.5" inputmode="decimal" value="' + utils.escapeHtml(remaining) + '" aria-describedby="f-remaining-error" placeholder="Default = ukuran">' +
-      '<span class="field__error" id="f-remaining-error" role="alert"></span>' +
-      "</div>" +
-      "</div>" +
-      '<div class="form__grid">' +
-      '<div class="field">' +
-      '<label for="f-price" class="field__label">Harga Beli (Rp)</label>' +
-      '<input id="f-price" name="priceBuy" type="number" class="field__input" min="0" step="1000" inputmode="numeric" value="' + utils.escapeHtml(price) + '" aria-describedby="f-price-error">' +
-      '<span class="field__error" id="f-price-error" role="alert"></span>' +
-      "</div>" +
-      '<div class="field">' +
-      '<label for="f-date" class="field__label">Tanggal Beli</label>' +
-      '<input id="f-date" name="purchaseDate" type="date" class="field__input" value="' + utils.escapeHtml(date) + '">' +
-      "</div>" +
-      "</div>" +
-      '<div class="field">' +
-      '<span class="field__label" id="rating-label">Rating Pribadi</span>' +
-      '<div class="rating-picker" role="radiogroup" aria-labelledby="rating-label" id="rating-picker">' +
-      stars +
-      "</div>" +
-      '<input type="hidden" name="rating" value="' + rating + '">' +
-      "</div>" +
-      '<div class="form__actions">' +
-      '<button type="button" class="btn btn--ghost" data-action="close-modal">Batal</button>' +
-      '<button type="submit" class="btn btn--primary">Simpan</button>' +
-      "</div>" +
-      "</form>" +
-      "</div>" +
-      "</div>"
-    );
+    // Weather & Activity
+    var wOpts = "", aOpts = "";
+    var wKeys = Object.keys(Scentos.ui.WEATHER_MAP);
+    for (var w = 0; w < wKeys.length; w++) {
+      wOpts += '<option value="'+wKeys[w]+'"'+(j.weather===wKeys[w]?' selected':'')+'>'+Scentos.ui.WEATHER_MAP[wKeys[w]]+'</option>';
+    }
+    var aKeys = Object.keys(Scentos.ui.ACTIVITY_MAP);
+    for (var a = 0; a < aKeys.length; a++) {
+      aOpts += '<option value="'+aKeys[a]+'"'+(j.activity===aKeys[a]?' selected':'')+'>'+Scentos.ui.ACTIVITY_MAP[aKeys[a]]+'</option>';
+    }
+
+    // Star pickers logic
+    var proj = j.projection || 3;
+    var rat = j.ratingAfter || 3;
+    var projHtml = "", ratHtml = "";
+    for (var s = 1; s <= 5; s++) {
+      projHtml += '<button type="button" class="rating-picker__star '+(s<=proj?'is-active':'')+'" data-target="proj" data-value="'+s+'">\u2605</button>';
+      ratHtml += '<button type="button" class="rating-picker__star '+(s<=rat?'is-active':'')+'" data-target="rat" data-value="'+s+'">\u2605</button>';
+    }
+
+    var nowTime = new Date().toTimeString().slice(0,5);
+
+    return '<div class="modal" role="dialog" aria-modal="true"><div class="modal__backdrop" data-action="close-modal"></div><div class="modal__panel">' +
+      '<header class="modal__header"><h2 class="modal__title">'+(isEdit?'Edit Catatan':'Catat Pemakaian')+'</h2><button type="button" class="btn btn--ghost btn--icon" data-action="close-modal">X</button></header>' +
+      '<form id="journal-form" class="form" novalidate>' +
+      '<div class="field"><label class="field__label">Parfum *</label><select name="perfumeId" class="field__input select" required data-autofocus>'+pOpts+'</select><span class="field__error" id="f-perfumeId-error"></span></div>' +
+      '<div class="form__grid"><div class="field"><label class="field__label">Tanggal *</label><input name="date" type="date" class="field__input" required value="'+(j.date||new Date().toISOString().slice(0,10))+'"></div>' +
+      '<div class="field"><label class="field__label">Jam</label><input name="time" type="time" class="field__input" value="'+(j.time||nowTime)+'"></div></div>' +
+      '<div class="form__grid"><div class="field"><label class="field__label">Cuaca</label><select name="weather" class="field__input select">'+wOpts+'</select></div>' +
+      '<div class="field"><label class="field__label">Aktivitas</label><select name="activity" class="field__input select">'+aOpts+'</select></div></div>' +
+      '<div class="form__grid"><div class="field"><label class="field__label">Semprotan *</label><input name="sprays" type="number" class="field__input" required min="1" max="20" value="'+(j.sprays||3)+'"><span class="field__error" id="f-sprays-error"></span></div>' +
+      '<div class="field"><label class="field__label">Longevity (jam)</label><input name="longevity" type="number" class="field__input" min="0.5" max="24" step="0.5" value="'+(j.longevity||6)+'"></div></div>' +
+      '<div class="form__grid"><div class="field"><span class="field__label">Projection</span><div class="rating-picker" id="picker-proj">'+projHtml+'</div><input type="hidden" name="projection" value="'+proj+'"></div>' +
+      '<div class="field"><span class="field__label">Rating After</span><div class="rating-picker" id="picker-rat">'+ratHtml+'</div><input type="hidden" name="ratingAfter" value="'+rat+'"></div></div>' +
+      '<div class="field"><label class="field__label">Catatan</label><textarea name="notes" class="field__input" rows="2" placeholder="Enak buat meeting...">'+utils.escapeHtml(j.notes||'')+'</textarea></div>' +
+      '<div class="field" style="flex-direction:row;align-items:center;gap:8px;margin-top:8px;">' +
+      '<input type="checkbox" name="reduceInventory" id="reduceInventory" '+(isEdit?(j.reducedInventory?'checked':''):'checked')+' style="width:20px;height:20px;accent-color:var(--accent);">' +
+      '<label for="reduceInventory" style="font-size:14px;color:var(--muted);">Potong sisa isi parfum otomatis ('+(CONST.ML_PER_SPRAY*1000)+' ml/semprotan)</label></div>' +
+      '<div class="form__actions"><button type="button" class="btn btn--ghost" data-action="close-modal">Batal</button><button type="submit" class="btn btn--primary">Simpan</button></div>' +
+      '</form></div></div>';
   }
 
-  function openAddModal() {
-    openModalRoot(renderFormModal(null), { mode: "add", perfume: null });
-    var form = document.getElementById("perfume-form");
-    if (!form) return;
-    var dateInput = form.querySelector('[name="purchaseDate"]');
-    if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
-    form.addEventListener("submit", onFormSubmit);
-    attachRatingPicker(form);
+  /* ---------- Confirm Delete ---------- */
+  function openDeletePerfumeConfirm(perfume) {
+    var journals = stateApi.get().journals.filter(function(j){ return j.perfumeId === perfume.id; });
+    var warningHtml = journals.length > 0 
+      ? '<p style="color:var(--danger);margin-top:8px;font-size:13px;font-weight:600;">\u26a0\ufe0f Ini juga akan menghapus '+journals.length+' catatan pemakaian terkait.</p>' 
+      : '';
+      
+    var html = '<div class="modal" role="alertdialog" aria-modal="true"><div class="modal__backdrop" data-action="close-modal"></div><div class="modal__panel modal__panel--sm">' +
+      '<h2 class="modal__title">Hapus Parfum?</h2>' +
+      '<p class="modal__desc"><strong>"'+utils.escapeHtml(perfume.name)+'"</strong> akan dihapus dari koleksi.'+warningHtml+'</p>' +
+      '<div class="modal__actions"><button type="button" class="btn btn--ghost" data-action="close-modal" data-autofocus>Batal</button><button type="button" class="btn btn--danger" data-action="confirm-delete-perfume" data-id="'+utils.escapeHtml(perfume.id)+'">Ya, Hapus</button></div></div></div>';
+    
+    openModalRoot(html, { mode: "delete-perfume", data: perfume });
   }
 
-  function openEditModal(perfume) {
-    openModalRoot(renderFormModal(perfume), { mode: "edit", perfume: perfume });
-    var form = document.getElementById("perfume-form");
-    if (!form) return;
-    form.addEventListener("submit", onFormSubmit);
-    attachRatingPicker(form);
+  function openDeleteJournalConfirm(journal) {
+    var html = '<div class="modal" role="alertdialog" aria-modal="true"><div class="modal__backdrop" data-action="close-modal"></div><div class="modal__panel modal__panel--sm">' +
+      '<h2 class="modal__title">Hapus Catatan?</h2>' +
+      '<p class="modal__desc">Catatan pemakaian <strong>"'+utils.escapeHtml(journal.perfumeName)+'"</strong> pada '+journal.date+' akan dihapus.</p>' +
+      '<div class="modal__actions"><button type="button" class="btn btn--ghost" data-action="close-modal" data-autofocus>Batal</button><button type="button" class="btn btn--danger" data-action="confirm-delete-journal" data-id="'+utils.escapeHtml(journal.id)+'">Ya, Hapus</button></div></div></div>';
+      
+    openModalRoot(html, { mode: "delete-journal", data: journal });
   }
 
-  function openDeleteConfirm(perfume) {
-    var html =
-      '<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">' +
-      '<div class="modal__backdrop" data-action="close-modal"></div>' +
-      '<div class="modal__panel modal__panel--sm">' +
-      '<h2 id="confirm-title" class="modal__title">Hapus parfum?</h2>' +
-      '<p id="confirm-desc" class="modal__desc">' +
-      '<strong>"' + utils.escapeHtml(perfume.name) + '"</strong> akan dihapus dari koleksi. Tindakan ini tidak bisa dibatalkan.' +
-      "</p>" +
-      '<div class="modal__actions">' +
-      '<button type="button" class="btn btn--ghost" data-action="close-modal" data-autofocus>Batal</button>' +
-      '<button type="button" class="btn btn--danger" data-action="confirm-delete">Ya, Hapus</button>' +
-      "</div>" +
-      "</div>" +
-      "</div>";
-    openModalRoot(html, { mode: "delete", perfume: perfume });
-  }
-
-  /* ---------- Rating picker ---------- */
-  function attachRatingPicker(form) {
-    var picker = form.querySelector("#rating-picker");
+  /* ---------- Form Handlers ---------- */
+  function attachRatingPicker(selector, inputName, form) {
+    var picker = form.querySelector(selector);
     if (!picker) return;
-    picker.addEventListener("click", function (e) {
+    picker.addEventListener("click", function(e) {
       var star = e.target.closest(".rating-picker__star");
       if (!star) return;
-      var value = parseInt(star.getAttribute("data-value"), 10);
-      var hidden = form.querySelector('input[type="hidden"][name="rating"]');
-      if (hidden) hidden.value = value;
-      var all = picker.querySelectorAll(".rating-picker__star");
-      for (var i = 0; i < all.length; i++) {
-        var v = parseInt(all[i].getAttribute("data-value"), 10);
-        all[i].classList.toggle("is-active", v <= value);
-        all[i].setAttribute("aria-checked", v === value ? "true" : "false");
+      var val = parseInt(star.getAttribute("data-value"), 10);
+      form.querySelector('input[name="'+inputName+'"]').value = val;
+      var stars = picker.querySelectorAll(".rating-picker__star");
+      for (var i = 0; i < stars.length; i++) {
+        stars[i].classList.toggle("is-active", parseInt(stars[i].getAttribute("data-value"), 10) <= val);
       }
     });
   }
 
-  /* ---------- Form data & validation ---------- */
-  function parseNotes(str) {
-    return String(str || "")
-      .split(",")
-      .map(function (s) { return s.trim(); })
-      .filter(Boolean);
-  }
-
-  function readFormData(form) {
-    var fd = new FormData(form);
-    var sizeMl = utils.parseNumber(fd.get("sizeMl"));
-    var remainingMl = utils.parseNumber(fd.get("remainingMl"));
-    if (remainingMl == null && sizeMl != null && sizeMl > 0) {
-      remainingMl = sizeMl;
-    }
-    var priceBuy = utils.parseNumber(fd.get("priceBuy"));
-    if (priceBuy == null) priceBuy = 0;
-    var rating = parseInt(fd.get("rating"), 10);
-    if (!isFinite(rating)) rating = 3;
-
-    return {
-      name: String(fd.get("name") || "").trim(),
-      brand: String(fd.get("brand") || "").trim(),
-      topNotes: parseNotes(fd.get("topNotes")),
-      midNotes: parseNotes(fd.get("midNotes")),
-      baseNotes: parseNotes(fd.get("baseNotes")),
-      sizeMl: sizeMl,
-      remainingMl: remainingMl,
-      priceBuy: priceBuy,
-      purchaseDate: String(fd.get("purchaseDate") || ""),
-      rating: rating
-    };
-  }
-
-  function validateFormData(data) {
-    var errors = {};
-    if (!data.name || data.name.length < 2) {
-      errors.name = "Nama parfum minimal 2 karakter.";
-    }
-    if (!data.brand) {
-      errors.brand = "Brand wajib diisi.";
-    }
-    if (data.sizeMl == null || data.sizeMl <= 0) {
-      errors.sizeMl = "Ukuran botol harus lebih dari 0 ml.";
-    }
-    if (
-      data.remainingMl == null ||
-      data.remainingMl < 0 ||
-      (data.sizeMl > 0 && data.remainingMl > data.sizeMl)
-    ) {
-      errors.remainingMl = "Sisa isi harus antara 0 dan ukuran botol.";
-    }
-    if (data.priceBuy < 0) {
-      errors.priceBuy = "Harga tidak boleh negatif.";
-    }
-    if (!data.purchaseDate) {
-      data.purchaseDate = new Date().toISOString().slice(0, 10);
-    }
-    if (data.rating < 1 || data.rating > 5) {
-      errors.rating = "Rating harus antara 1 dan 5.";
-    }
-    return Object.keys(errors).length ? errors : null;
-  }
-
-  function clearFormErrors(form) {
-    var errs = form.querySelectorAll(".field__error");
-    for (var i = 0; i < errs.length; i++) errs[i].textContent = "";
-    var invalid = form.querySelectorAll('[aria-invalid="true"]');
-    for (var j = 0; j < invalid.length; j++) {
-      invalid[j].removeAttribute("aria-invalid");
-    }
-  }
-
-  function showFormErrors(form, errors) {
-    Object.keys(errors).forEach(function (field) {
-      var errEl = form.querySelector("#f-" + field + "-error");
-      var inputEl = form.querySelector('[name="' + field + '"]');
-      if (errEl) errEl.textContent = errors[field];
-      if (inputEl) inputEl.setAttribute("aria-invalid", "true");
-    });
-    var firstInvalid = form.querySelector('[aria-invalid="true"]');
-    if (firstInvalid && typeof firstInvalid.focus === "function") firstInvalid.focus();
-  }
-
-  function onFormSubmit(e) {
+  function handlePerfumeSubmit(e) {
     e.preventDefault();
     var form = e.target;
-    clearFormErrors(form);
+    var fd = new FormData(form);
+    var sizeMl = utils.parseNumber(fd.get("sizeMl"));
+    var remaining = utils.parseNumber(fd.get("remainingMl"));
+    if (remaining == null && sizeMl != null) remaining = sizeMl;
 
-    var data = readFormData(form);
-    var errors = validateFormData(data);
-
-    if (errors) {
-      showFormErrors(form, errors);
-      return;
-    }
-
-    var submitBtn = form.querySelector('button[type="submit"]');
-    var originalLabel = submitBtn ? submitBtn.textContent : "Simpan";
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Menyimpan\u2026";
-    }
-
-    var existing = currentModal ? currentModal.perfume : null;
-    var now = Date.now();
-
-    var perfume = {
-      id: existing ? existing.id : utils.uuid(),
-      name: data.name,
-      brand: data.brand,
+    var data = {
+      name: String(fd.get("name")||"").trim(),
+      brand: String(fd.get("brand")||"").trim(),
       notes: {
-        top: data.topNotes,
-        mid: data.midNotes,
-        base: data.baseNotes
+        top: String(fd.get("topNotes")||"").split(",").map(function(s){return s.trim();}).filter(Boolean),
+        mid: String(fd.get("midNotes")||"").split(",").map(function(s){return s.trim();}).filter(Boolean),
+        base: String(fd.get("baseNotes")||"").split(",").map(function(s){return s.trim();}).filter(Boolean)
       },
-      sizeMl: data.sizeMl,
-      remainingMl: data.remainingMl,
-      priceBuy: data.priceBuy,
-      purchaseDate: data.purchaseDate,
-      rating: data.rating,
-      photo: existing ? existing.photo : null,
-      createdAt: existing ? existing.createdAt : now,
+      sizeMl: sizeMl, remainingMl: remaining,
+      priceBuy: utils.parseNumber(fd.get("priceBuy")) || 0,
+      purchaseDate: String(fd.get("purchaseDate")||""),
+      rating: parseInt(fd.get("rating"), 10) || 3
+    };
+
+    if (!data.name) { document.getElementById("f-name-error").textContent = "Wajib diisi"; return; }
+    if (!data.brand) { document.getElementById("f-brand-error").textContent = "Wajib diisi"; return; }
+    if (!data.sizeMl || data.sizeMl <= 0) { document.getElementById("f-sizeMl-error").textContent = "Min 1 ml"; return; }
+
+    var existing = currentModal.data;
+    var isEdit = currentModal.mode === "edit";
+    var now = Date.now();
+    var payload = {
+      id: isEdit ? existing.id : utils.uuid(),
+      ...data,
+      photo: isEdit ? existing.photo : null,
+      createdAt: isEdit ? existing.createdAt : now,
       updatedAt: now
     };
 
-    var op = existing ? db.updatePerfume(perfume) : db.addPerfume(perfume);
-
-    op.then(function () {
-      if (existing) {
-        stateApi.updatePerfumeInList(perfume);
-        showToast("Parfum berhasil diperbarui", "success");
-      } else {
-        stateApi.addPerfumeToList(perfume);
-        showToast("Parfum berhasil ditambahkan", "success");
-      }
+    var op = isEdit ? db.updatePerfume(payload) : db.addPerfume(payload);
+    op.then(function() {
+      if (isEdit) { stateApi.updatePerfumeInList(payload); showToast("Parfum diperbarui"); }
+      else { stateApi.addPerfumeToList(payload); showToast("Parfum ditambahkan"); }
       closeModal();
-    }).catch(function (err) {
-      console.error("[Scentos] Save failed:", err);
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalLabel;
-      }
-      showToast("Gagal menyimpan: " + (err && err.message ? err.message : "Error"), "error");
+    }).catch(function(err) {
+      console.error(err); showToast("Gagal simpan", "error");
     });
   }
 
-  /* ---------- Delete ---------- */
-  function confirmDelete() {
-    if (!currentModal || !currentModal.perfume) return;
-    var target = currentModal.perfume;
+  function handleJournalSubmit(e) {
+    e.preventDefault();
+    var form = e.target;
+    var fd = new FormData(form);
+    
+    var perfumeId = String(fd.get("perfumeId")||"");
+    var sprays = utils.parseNumber(fd.get("sprays")) || 1;
+    var longevity = utils.parseNumber(fd.get("longevity")) || 6;
+    var reduce = fd.get("reduceInventory") === "on";
 
-    var btns = document.querySelectorAll(".modal [data-action]");
-    for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+    if (!perfumeId) { document.getElementById("f-perfumeId-error").textContent = "Pilih parfum"; return; }
 
-    db.deletePerfume(target.id).then(function () {
-      stateApi.removePerfumeFromList(target.id);
-      closeModal();
-      showToast('"' + target.name + '" dihapus dari koleksi', "success");
-    }).catch(function (err) {
-      console.error("[Scentos] Delete failed:", err);
-      for (var j = 0; j < btns.length; j++) btns[j].disabled = false;
-      showToast("Gagal menghapus: " + (err && err.message ? err.message : "Error"), "error");
-    });
-  }
+    var targetPerfume = null;
+    var perfumes = stateApi.get().perfumes;
+    for (var i=0; i<perfumes.length; i++) if (perfumes[i].id === perfumeId) targetPerfume = perfumes[i];
+    if (!targetPerfume) return;
 
-  /* ---------- Global event delegation ---------- */
-  function onDocumentClick(e) {
-    var el = e.target.closest("[data-action]");
-    if (!el) return;
+    var isEdit = currentModal.mode === "edit-journal";
+    var existing = isEdit ? currentModal.data : null;
+    var now = Date.now();
+    var mlUsed = sprays * CONST.ML_PER_SPRAY;
 
-    // Kalau di dalam modal, biarkan modal handler yang proses
-    if (el.closest(".modal")) return;
-
-    var action = el.getAttribute("data-action");
-    var id = el.getAttribute("data-id");
-
-    if (action === "open-add") {
-      openAddModal();
-    } else if (action === "edit" && id) {
-      var found = null;
-      var list = stateApi.get().perfumes;
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].id === id) { found = list[i]; break; }
-      }
-      if (found) openEditModal(found);
-    } else if (action === "delete" && id) {
-      var target = null;
-      var list2 = stateApi.get().perfumes;
-      for (var k = 0; k < list2.length; k++) {
-        if (list2[k].id === id) { target = list2[k]; break; }
-      }
-      if (target) openDeleteConfirm(target);
-    } else if (action === "reset-filters") {
-      var searchInput = document.getElementById("search-input");
-      if (searchInput) searchInput.value = "";
-      var brandSelect = document.getElementById("filter-brand");
-      if (brandSelect) brandSelect.value = "all";
-      stateApi.setSearch("");
-      stateApi.setFilterBrand("all");
-    } else if (action === "reload") {
-      stateApi.setStatus("loading");
-      db.getAllPerfumes().then(function (list) {
-        stateApi.setPerfumes(list);
-      }).catch(function (err) {
-        stateApi.setStatus("error", err && err.message);
+    // Siapkan data parfum yang mau diupdate (jika reduce dicentang)
+    var perfumeToUpdate = null;
+    if (reduce) {
+      var currentRem = Number(targetPerfume.remainingMl) || 0;
+      // Kalau edit, balikin dulu sisa ml dari log lama, baru potong yang baru
+      var oldMl = (existing && existing.reducedInventory) ? (existing.sprays * CONST.ML_PER_SPRAY) : 0;
+      var newRem = Math.max(0, currentRem + oldMl - mlUsed);
+      
+      perfumeToUpdate = Object.assign({}, targetPerfume, { 
+        remainingMl: newRem, updatedAt: now 
       });
+    } else if (isEdit && existing && existing.reducedInventory) {
+      // Kalau user uncheck reduce saat edit, balikin ml-nya
+      perfumeToUpdate = Object.assign({}, targetPerfume, { 
+        remainingMl: Math.min(targetPerfume.sizeMl, (Number(targetPerfume.remainingMl)||0) + (existing.sprays * CONST.ML_PER_SPRAY)), 
+        updatedAt: now 
+      });
+    }
+
+    var payload = {
+      id: isEdit ? existing.id : utils.uuid(),
+      perfumeId: perfumeId,
+      perfumeName: targetPerfume.name,
+      perfumeBrand: targetPerfume.brand,
+      date: String(fd.get("date")),
+      time: String(fd.get("time")),
+      weather: String(fd.get("weather")),
+      activity: String(fd.get("activity")),
+      sprays: sprays,
+      longevity: longevity,
+      projection: parseInt(fd.get("projection"), 10) || 3,
+      ratingAfter: parseInt(fd.get("ratingAfter"), 10) || 3,
+      notes: String(fd.get("notes")||"").trim(),
+      mlUsed: mlUsed,
+      reducedInventory: reduce,
+      createdAt: isEdit ? existing.createdAt : now,
+      updatedAt: now
+    };
+
+    db.saveJournal(payload, perfumeToUpdate).then(function() {
+      if (perfumeToUpdate) stateApi.updatePerfumeInList(perfumeToUpdate);
+      
+      if (isEdit) {
+        stateApi.updateJournalInList(payload);
+        showToast("Catatan diperbarui");
+      } else {
+        stateApi.addJournalToList(payload);
+        showToast("Pemakaian dicatat");
+      }
+      closeModal();
+    }).catch(function(err) {
+      console.error(err); showToast("Gagal simpan catatan", "error");
+    });
+  }
+
+  /* ---------- Global Event Delegation ---------- */
+  function onDocumentClick(e) {
+    var btn = e.target.closest("[data-action]");
+    if (!btn) return;
+
+    var action = btn.getAttribute("data-action");
+    var id = btn.getAttribute("data-id");
+
+    // --- NAVIGATION & TABS ---
+    if (action === "switch-view") {
+      stateApi.setView(btn.getAttribute("data-view"));
+      return;
+    }
+    if (action === "switch-journal-tab") {
+      stateApi.setJournalTab(btn.getAttribute("data-tab"));
+      return;
+    }
+
+    // --- PERFUME ACTIONS ---
+    if (action === "open-add") {
+      openModalRoot(renderPerfumeModal(null), { mode: "add" });
+      document.getElementById("perfume-form").addEventListener("submit", handlePerfumeSubmit);
+      attachRatingPicker("#rating-picker", "rating", document.getElementById("perfume-form"));
+      return;
+    }
+    if (action === "edit" && id) {
+      var p = stateApi.get().perfumes.find(function(x){ return x.id === id; });
+      if (p) {
+        openModalRoot(renderPerfumeModal(p), { mode: "edit", data: p });
+        document.getElementById("perfume-form").addEventListener("submit", handlePerfumeSubmit);
+        attachRatingPicker("#rating-picker", "rating", document.getElementById("perfume-form"));
+      }
+      return;
+    }
+    if (action === "delete" && id) {
+      var p2 = stateApi.get().perfumes.find(function(x){ return x.id === id; });
+      if (p2) openDeletePerfumeConfirm(p2);
+      return;
+    }
+    if (action === "confirm-delete-perfume" && id) {
+      btn.disabled = true;
+      db.deletePerfume(id).then(function() {
+        stateApi.removePerfumeFromList(id);
+        closeModal();
+        showToast("Parfum & catatannya dihapus");
+      }).catch(function(){ btn.disabled = false; showToast("Gagal hapus", "error"); });
+      return;
+    }
+
+    // --- JOURNAL ACTIONS ---
+    if (action === "open-journal") {
+      openModalRoot(renderJournalModal(null), { mode: "add-journal" });
+      document.getElementById("journal-form").addEventListener("submit", handleJournalSubmit);
+      attachRatingPicker("#picker-proj", "projection", document.getElementById("journal-form"));
+      attachRatingPicker("#picker-rat", "ratingAfter", document.getElementById("journal-form"));
+      return;
+    }
+    if (action === "edit-journal" && id) {
+      var j = stateApi.get().journals.find(function(x){ return x.id === id; });
+      if (j) {
+        openModalRoot(renderJournalModal(j), { mode: "edit-journal", data: j });
+        document.getElementById("journal-form").addEventListener("submit", handleJournalSubmit);
+        attachRatingPicker("#picker-proj", "projection", document.getElementById("journal-form"));
+        attachRatingPicker("#picker-rat", "ratingAfter", document.getElementById("journal-form"));
+      }
+      return;
+    }
+    if (action === "delete-journal" && id) {
+      var j2 = stateApi.get().journals.find(function(x){ return x.id === id; });
+      if (j2) openDeleteJournalConfirm(j2);
+      return;
+    }
+    if (action === "confirm-delete-journal" && id) {
+      btn.disabled = true;
+      db.deleteJournal(id).then(function() {
+        stateApi.removeJournalFromList(id);
+        closeModal();
+        showToast("Catatan dihapus");
+      }).catch(function(){ btn.disabled = false; showToast("Gagal hapus", "error"); });
+      return;
+    }
+
+    // --- FILTERS & UTILS ---
+    if (action === "reset-filters") {
+      document.getElementById("search-input").value = "";
+      stateApi.setSearch(""); stateApi.setFilterBrand("all");
+      return;
+    }
+    if (action === "reload") {
+      window.location.reload();
+      return;
+    }
+    if (action === "close-modal") {
+      closeModal();
+      return;
+    }
+  }
+
+  function onDocumentChange(e) {
+    var action = e.target.getAttribute("data-action");
+    if (action === "filter-journal-perfume") {
+      stateApi.setJournalFilters(e.target.value, undefined);
+    }
+    if (action === "filter-journal-range") {
+      stateApi.setJournalFilters(undefined, e.target.value);
+    }
+    // Sinkronisasi filter brand di inventory
+    if (e.target.id === "filter-brand") {
+      stateApi.setFilterBrand(e.target.value);
     }
   }
 
   function onDocumentKeyDown(e) {
-    if (e.key !== "Escape") return;
-    if (currentModal) {
-      e.preventDefault();
-      closeModal();
-    }
-  }
-
-  /* ---------- Search input ---------- */
-  function attachSearch() {
-    var input = document.getElementById("search-input");
-    if (!input) return;
-    input.addEventListener("input", function (e) {
-      var value = e.target.value;
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(function () {
-        stateApi.setSearch(value);
-      }, 150);
-    });
-  }
-
-  /* ---------- Brand filter ---------- */
-  function attachBrandFilter() {
-    var select = document.getElementById("filter-brand");
-    if (!select) return;
-    select.addEventListener("change", function (e) {
-      stateApi.setFilterBrand(e.target.value);
-    });
+    if (e.key === "Escape" && currentModal) { e.preventDefault(); closeModal(); }
   }
 
   /* ---------- Init ---------- */
   function init() {
     document.addEventListener("click", onDocumentClick);
+    document.addEventListener("change", onDocumentChange);
     document.addEventListener("keydown", onDocumentKeyDown);
-    attachSearch();
-    attachBrandFilter();
-
-    // Animasi card: hapus class card--entering setelah selesai
-    // supaya hover transform desktop tidak konflik dengan animation-fill-mode
-    var main = document.getElementById("main");
-    if (main) {
-      main.addEventListener("animationend", function (e) {
-        if (e.target && e.target.classList && e.target.classList.contains("card--entering")) {
-          e.target.classList.remove("card--entering");
-        }
+    
+    var searchInput = document.getElementById("search-input");
+    if (searchInput) {
+      searchInput.addEventListener("input", function(e) {
+        clearTimeout(searchTimer);
+        var val = e.target.value;
+        searchTimer = setTimeout(function(){ stateApi.setSearch(val); }, 150);
       });
     }
   }
 
-  /* ---------- Export ---------- */
   Scentos.ui = {
-    init: init,
-    openAddModal: openAddModal,
-    openEditModal: openEditModal,
-    openDeleteConfirm: openDeleteConfirm,
-    closeModal: closeModal,
-    showToast: showToast
+    init: init, showToast: showToast, icons: icons,
+    renderJournalTimeline: function(){ return ""; }, // Override by journal.js
+    renderJournalStats: function(){ return ""; }     // Override by journal.js
   };
+
 })(window.Scentos = window.Scentos || {});
