@@ -1,19 +1,10 @@
-/* =========================================================
-   SCENTOS — Entry point
-   ========================================================= */
-
 (function (Scentos) {
   "use strict";
 
   function init() {
     Scentos.ui.init();
     Scentos.state.setStatus("loading");
-
-    // Load perfumes & journals secara paralel
-    Promise.all([
-      Scentos.db.getAllPerfumes(),
-      Scentos.db.getAllJournals()
-    ]).then(function(results) {
+    Promise.all([ Scentos.db.getAllPerfumes(), Scentos.db.getAllJournals() ]).then(function(results) {
       Scentos.state.setData(results[0], results[1]);
     }).catch(function(err) {
       console.error("[Scentos] Load error:", err);
@@ -21,9 +12,5 @@
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", init); } else { init(); }
 })(window.Scentos = window.Scentos || {});
