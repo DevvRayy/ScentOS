@@ -1,0 +1,128 @@
+/* =========================================================
+   SCENTOS — Animations
+   Prinsip: hanya transform + opacity. Tidak ada animasi
+   properti layout (top/left/width/height/margin).
+   ========================================================= */
+
+/* ==== Keyframes ==== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUpModal {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastOut {
+  to {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes shimmerSlide {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* ==== Entrance: card ==== */
+.card--entering {
+  animation: fadeSlideUp var(--dur-slow) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* ==== Page entrance (view change) ==== */
+.view-enter {
+  animation: fadeIn var(--dur) var(--ease) both;
+}
+
+/* ==== Toast ==== */
+.toast {
+  animation: toastIn var(--dur) var(--ease);
+}
+.toast--leaving {
+  animation: toastOut var(--dur-fast) var(--ease) forwards;
+}
+
+/* ==== Skeleton shimmer — pakai transform, bukan bg-position ==== */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.skeleton::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmerSlide 1.4s linear infinite;
+  pointer-events: none;
+}
+
+/* =========================================================
+   REDUCED MOTION — wajib, non-esensial dimatikan
+   ========================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .card--entering,
+  .view-enter,
+  .toast,
+  .toast--leaving,
+  .modal__backdrop,
+  .modal__panel {
+    animation: none !important;
+  }
+
+  .skeleton::before {
+    animation: none !important;
+    opacity: 0;
+  }
+
+  /* Matikan transisi yang non-esensial */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

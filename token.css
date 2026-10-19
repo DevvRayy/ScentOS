@@ -1,0 +1,78 @@
+/* =========================================================
+   SCENTOS — Design Tokens
+   Semua nilai visual terpusat di sini.
+   ========================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #0b1020;
+  --surface: #121a2b;
+  --surface-hover: #19243a;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --text: #edf3ff;
+  --muted: #94a3b8;
+
+  /* Semantic */
+  --accent: #65d8f2;
+  --accent-contrast: #0b1020;
+  --success: #35d39a;
+  --success-contrast: #0b1020;
+  --danger: #f2666f;
+  --danger-contrast: #0b1020;
+
+  /* Shape */
+  --radius: 18px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 160ms;
+  --dur: 220ms;
+  --dur-slow: 420ms;
+
+  /* Elevation */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset,
+              0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
+/* Light mode — otomatis kalau OS user light */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --bg: #eef2f8;
+    --surface: #ffffff;
+    --surface-hover: #f3f6fc;
+    --border: rgba(15, 23, 42, 0.09);
+    --border-strong: rgba(15, 23, 42, 0.16);
+
+    --text: #0b1020;
+    --muted: #55647a;
+
+    --accent: #0891b2;
+    --accent-contrast: #ffffff;
+    --success: #0f9d6b;
+    --success-contrast: #ffffff;
+    --danger: #dc2626;
+    --danger-contrast: #ffffff;
+
+    --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset,
+                0 8px 20px rgba(15, 23, 42, 0.08);
+    --shadow-2: 0 20px 48px rgba(15, 23, 42, 0.18);
+  }
+}
